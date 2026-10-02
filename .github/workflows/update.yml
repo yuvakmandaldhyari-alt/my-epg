@@ -1,0 +1,49 @@
+name: Update EPG
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout my-epg
+        uses: actions/checkout@v4
+
+      - name: Checkout iptv-org/epg
+        uses: actions/checkout@v4
+        with:
+          repository: iptv-org/epg
+          path: epg
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: epg/package-lock.json
+
+      - name: Install dependencies
+        working-directory: epg
+        run: npm install
+
+      - name: Copy custom channel list
+        run: cp airtelxstream.in.channels.xml epg/custom.channels.xml
+
+      - name: Generate XMLTV guide
+        working-directory: epg
+        run: npm run grab --- --channels=custom.channels.xml --output=../guide.xml
+
+      - name: Commit guide.xml
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add guide.xml
+          git diff --cached --quiet || git commit -m "Update XMLTV EPG"
+          git push
